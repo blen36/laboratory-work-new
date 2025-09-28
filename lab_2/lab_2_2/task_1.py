@@ -8,6 +8,7 @@ def flatten(lst):
             i += 1
     if any(isinstance(i, list) for i in lst):
         flatten(lst)
+
 lst=[[1,2,3],[4,5,6],[7,8,9]]
 print(f"Лист до: {lst}")
 flatten(lst)
