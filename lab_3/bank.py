@@ -13,6 +13,8 @@ class InsufficientFunds(BankError):
 class ClientNotFound(BankError):
     pass
 
+CURRENCY_RATES = {"BYN": 1.0, "USD": 3.0, "EUR": 3.98}
+
 class Bank:
     def __init__(self):
         self.clients = {} #словарик айди клиента - имя клиента
@@ -32,6 +34,7 @@ class Bank:
     def open_account(self, client_id, currency):
         client = self.get_client(client_id)
         client.add_account(currency)
+        print(f"Счет {currency} открыт для клиента {client.name}.")
 
     def close_account(self, client_id, currency):
         client = self.get_client(client_id)
@@ -50,17 +53,33 @@ class Bank:
         acc.withdraw(amount)
         print(f"Со счета {currency} снято {amount:.2f}. ")
 
-    def transfer(self, client_id, from_currency, to_currency, amount):
-        client = self.get_client(client_id)
-        acc_from = client.get_account(from_currency)
-        acc_to = client.get_account(to_currency)
+    def transfer(self, from_client_id, from_currency, to_client_id, to_currency, amount):
+        sender = self.get_client(from_client_id)
+        receiver = self.get_client(to_client_id)
+
+        acc_from = sender.get_account(from_currency)
+        acc_to = receiver.get_account(to_currency)
+
         acc_from.withdraw(amount)
-        acc_to.deposit(amount)
-        print(f"Переведено {amount:.2f} из счета {from_currency} на счет {to_currency}.")
 
-    def print_statements(self, client_id):
-        pass
+        amount_in_byn = amount * CURRENCY_RATES[from_currency]
+        amount_converted = amount_in_byn / CURRENCY_RATES[to_currency]
 
+        acc_to.deposit(amount_converted)
+        f"Переведено {amount:.2f} {from_currency} от {sender.name} "
+        f"к {receiver.name} ({amount_converted:.2f} {to_currency} после конверсии)."
+
+    def print_statement(self, client_id):
+        client = self.get_client(client_id)
+        filename = f"{client.name}.txt"
+        with open(filename, "w", encoding = "utf-8") as f:
+            f.write(f"Выписка по клиенту: {client.name} (ID: {client.client_id})\n\n ")
+            total_byn = 0
+            for acc in client.accounts.values():
+                f.write(f"{acc.currency}: {acc.balance:.2f}\n")
+                total_byn += acc.balance * CURRENCY_RATES[acc.currency]
+            f.write(f"\nОбщий баланс (в BYN): {total_byn:.2f}\n")
+        print(f"Выписка сохранена в файл {filename}.")
 
 class Client:
     def __init__(self, client_id, name):
@@ -82,9 +101,6 @@ class Client:
         if currency not in self.accounts:
             raise AccountNotFound(f"Нет счета в валюте {currency}.")
         return self.accounts[currency]
-
-    def get_total_balance(self):
-        return sum(acc.balance for acc in self.accounts.values())
 
     def __str__(self):
         return f"{self.name} (ID: {self.client_id})"
@@ -120,7 +136,7 @@ def main():
         print("3. Закрыть счет")
         print("4. Пополнить счет")
         print("5. Снять деньги")
-        print("6. Перевести между своими счетами")
+        print("6. Перевести между счетами")
         print("7. Выписка по счетам")
         print("0. Выход")
 
@@ -155,14 +171,28 @@ def main():
                 bank.withdraw(client_id, currency, amount)
 
             elif choice == "6":
-                client_id = input("Введите ID клиента: ")
+                from_client_id = input("Введите ID отправителя: ")
                 from_currency = input("С какой валюты перевести: ").upper()
-                to_currency = input("На какую валюту перевести: ").upper()
+                to_client_id = input("Введите ID получателя: ")
+                to_currency = input("На какую валюту зачислить: ").upper()
                 amount = float(input("Введите сумму: "))
-                bank.transfer(client_id, from_currency, to_currency, amount)
+                bank.transfer(from_client_id, from_currency, to_client_id, to_currency, amount)
 
             elif choice == "7":
                 client_id = input("Введите ID клиента: ")
                 bank.print_statement(client_id)
-        finally:
-            print("...")
+
+            elif choice == "0":
+                print("Выход из программы.")
+                break
+
+            else:
+                print("Неверный выбор. Попробуйте снова.")
+
+        except BankError as e:
+            print("Ошибка: ", e)
+        except ValueError as e:
+            print("Ошибка: ", e)
+
+if __name__ == "__main__":
+    main()
