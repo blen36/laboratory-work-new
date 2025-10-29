@@ -1,5 +1,4 @@
 input_list = input("Введите список: ").split()
-
 original_list = input_list.copy()
 
 for el in original_list:
