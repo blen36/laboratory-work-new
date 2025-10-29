@@ -10,10 +10,25 @@ def transp_matrix(matrix):
             transposed[col].append(matrix[row][col])
     return transposed
 
-my_matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+def input_matrix():
+    print("Введите размеры матрицы:")
+    rows = int(input("Количество строк: "))
+    cols = int(input("Количество столбцов: "))
+
+    matrix = []
+    print(f"\nВведите матрицу {rows}×{cols} (числа через пробел):")
+
+    for i in range(rows):
+        row_input = input(f"Строка {i + 1}: ")
+        row = list(map(int, row_input.split()))
+        matrix.append(row)
+
+    return matrix
+
+my_matrix = input_matrix()
 transposed = transp_matrix(my_matrix)
 
-print("Исходная матрица:")
+print("\nИсходная матрица:")
 for row in my_matrix:
     print(row)
 
