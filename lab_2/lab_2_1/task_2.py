@@ -30,10 +30,10 @@ for digit in numbers:
     if digit%5==0:
         sum+=digit
 
-print(f"Уникальные цифры: {uniqueDigits}")
-print(f"Повторяющиеся цифры: {repeatedDigits}")
-print(f"Четные цифры: {chet}")
-print(f"Нечетные цифры: {nechet}")
+print(f"Уникальные числа: {uniqueDigits}")
+print(f"Повторяющиеся числа: {repeatedDigits}")
+print(f"Четные числа: {chet}")
+print(f"Нечетные числа: {nechet}")
 print(f"Отрицательные числа: {negative}")
 print(f"Числа с плавающей точкой: {isFloat}")
 print(f"Сумму всех чисел, кратных 5: {sum}")
