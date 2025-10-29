@@ -20,8 +20,8 @@ def merge_sorted_list(list1, list2):
 
     return result
 
-a = [1, 3, 5, 7]
-b = [2, 4, 6, 8, 10]
+a = list(map(int, input("Введите 1-ый отсортированный список чисел через пробел: ").split()))
+b = list(map(int, input("Введите 2-ой отсортированный список чисел через пробел: ").split()))
 
 print(f"Первый список: {a}")
 print(f"Второй список: {b}")
