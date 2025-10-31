@@ -1,11 +1,12 @@
 import time
+
 def timing(func):
     def wrapper(*args, **kwargs):
         start = time.time()
         result = func(*args, **kwargs)
         end = time.time()
         miliseconds = (end - start) * 1000
-        print(f"Функция {func.__name__} выплнялась {miliseconds}мл")
+        print(f"Функция {func.__name__} выполнялась {miliseconds}мл")
         return result
     return wrapper
 
