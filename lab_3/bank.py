@@ -155,7 +155,7 @@ class BankAccount:
         if amount <= 0:
             raise ValueError('Сумма должна быть положительной.')
         if amount > self.balance:
-            raise InsufficientFunds("Недостаточно средст на счете.")
+            raise InsufficientFunds("Недостаточно средств на счете.")
         self.balance -= amount
 
     def __str__(self):
@@ -195,41 +195,25 @@ def main():
 
 
             elif choice == "4":
-
                 client_id = input("Введите ID клиента: ")
-
                 currency = input("Введите валюту счета: ").upper()
-
                 amount = float(input("Введите сумму: "))
-
                 deposit_currency = input(
                     "Введите валюту пополнения (или Enter для использования валюты счета): ").upper()
-
                 if not deposit_currency:
-
                     bank.deposit(client_id, currency, amount)
-
                 else:
-
                     bank.deposit(client_id, currency, amount, deposit_currency)
 
 
             elif choice == "5":
-
                 client_id = input("Введите ID клиента: ")
-
                 currency = input("Введите валюту счета: ").upper()
-
                 amount = float(input("Введите сумму: "))
-
                 withdraw_currency = input("Введите валюту снятия (или Enter для использования валюты счета): ").upper()
-
                 if not withdraw_currency:
-
                     bank.withdraw(client_id, currency, amount)
-
                 else:
-
                     bank.withdraw(client_id, currency, amount, withdraw_currency)
 
             elif choice == "6":
