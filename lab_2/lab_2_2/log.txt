@@ -1,0 +1,6 @@
+2025-09-28 20:28:35.836644 - my_func(args=(5, 6), kwargs={})
+2025-09-28 20:28:35.838740 - greet(args=('Irina',), kwargs={})
+2025-09-28 20:28:35.839695 - greet(args=('Egor',), kwargs={'greeting': 'Hi'})
+2025-09-28 20:30:38.877902 - my_func(args=(5, 6), kwargs={})
+2025-09-28 20:30:38.879005 - greet(args=('Irina',), kwargs={'greeting': 'Hello'})
+2025-09-28 20:30:38.880194 - greet(args=('Egor',), kwargs={'greeting': 'Hi'})
