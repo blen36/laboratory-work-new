@@ -32,6 +32,9 @@ class Bank:
         return self.clients[client_id] #возвращает объект класса Client
 
     def open_account(self, client_id, currency):
+        currency = currency.upper()
+        if currency not in CURRENCY_RATES:
+            raise ValueError(f"Некорректная валюта: {currency}. Доступные: {', '.join(CURRENCY_RATES.keys())}")
         client = self.get_client(client_id)
         client.add_account(currency)
         print(f"Счет {currency} открыт для клиента {client.name}.")
@@ -41,17 +44,49 @@ class Bank:
         client.remove_account(currency)
         print(f"Счет {currency} закрыт для клиента {client.name}.")
 
-    def deposit(self, client_id, currency, amount):
-        client = self.get_client(client_id)
-        acc = client.get_account(currency)
-        acc.deposit(amount)
-        print(f"На счет {currency} зачислено {amount:.2f}. ")
+    def deposit(self, client_id, currency, amount, deposit_currency = None):
+        if deposit_currency is None:
+            deposit_currency = currency
 
-    def withdraw(self, client_id, currency, amount):
+        deposit_currency = deposit_currency.upper()
+        currency = currency.upper()
+
         client = self.get_client(client_id)
         acc = client.get_account(currency)
-        acc.withdraw(amount)
-        print(f"Со счета {currency} снято {amount:.2f}. ")
+
+        if deposit_currency != currency:
+            amount_in_byn = amount * CURRENCY_RATES[deposit_currency]
+            amount_converted = amount_in_byn / CURRENCY_RATES[currency]
+            acc.deposit(amount_converted)
+            print(
+                f"На счет {currency} зачислено {amount_converted:.2f} (конвертировано из {amount:.2f} {deposit_currency}).")
+        else:
+            acc.deposit(amount)
+            print(f"На счет {currency} зачислено {amount:.2f}.")
+
+    def withdraw(self, client_id, currency, amount, withdraw_currency = None):
+        if withdraw_currency is None:
+            withdraw_currency = currency
+
+        withdraw_currency = withdraw_currency.upper()
+        currency = currency.upper()
+
+        client = self.get_client(client_id)
+        acc = client.get_account(currency)
+
+        if withdraw_currency != currency:
+            amount_in_byn = amount * CURRENCY_RATES[withdraw_currency]
+            amount_converted = amount_in_byn / CURRENCY_RATES[currency]
+            if amount_converted > acc.balance:
+                raise InsufficientFunds(f"Недостаточно средств на счете {currency}. "
+                                        f"Требуется: {amount_converted:.2f} {currency}, "
+                                        f"доступно: {acc.balance:.2f} {currency}.")
+            acc.withdraw(amount_converted)
+            print(f"Со счета {currency} снято {amount:.2f} {withdraw_currency} "
+                  f"(конвертировано в {amount_converted:.2f} {currency}).")
+        else:
+            acc.withdraw(amount)
+            print(f"Со счета {currency} снято {amount:.2f}.")
 
     def transfer(self, from_client_id, from_currency, to_client_id, to_currency, amount):
         sender = self.get_client(from_client_id)
@@ -158,17 +193,44 @@ def main():
                 currency = input("Введите валюту для закрытия: ").upper()
                 bank.close_account(client_id, currency)
 
+
             elif choice == "4":
+
                 client_id = input("Введите ID клиента: ")
-                currency = input("Введите валюту: ").upper()
+
+                currency = input("Введите валюту счета: ").upper()
+
                 amount = float(input("Введите сумму: "))
-                bank.deposit(client_id, currency, amount)
+
+                deposit_currency = input(
+                    "Введите валюту пополнения (или Enter для использования валюты счета): ").upper()
+
+                if not deposit_currency:
+
+                    bank.deposit(client_id, currency, amount)
+
+                else:
+
+                    bank.deposit(client_id, currency, amount, deposit_currency)
+
 
             elif choice == "5":
+
                 client_id = input("Введите ID клиента: ")
-                currency = input("Введите валюту: ").upper()
+
+                currency = input("Введите валюту счета: ").upper()
+
                 amount = float(input("Введите сумму: "))
-                bank.withdraw(client_id, currency, amount)
+
+                withdraw_currency = input("Введите валюту снятия (или Enter для использования валюты счета): ").upper()
+
+                if not withdraw_currency:
+
+                    bank.withdraw(client_id, currency, amount)
+
+                else:
+
+                    bank.withdraw(client_id, currency, amount, withdraw_currency)
 
             elif choice == "6":
                 from_client_id = input("Введите ID отправителя: ")
