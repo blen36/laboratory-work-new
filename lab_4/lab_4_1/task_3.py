@@ -67,7 +67,6 @@ ax.add_patch(triangle)
 ax.text(8.2, 11.5, "Ирина Николаевна,\nэто Вам.", fontsize=6, color="black", ha="left")
 
 # --- Настройки отображения ---
-ax.set_aspect("equal")
 ax.set_xlim(-15, 15)
 ax.set_ylim(-15, 18)
 ax.axis("off")
