@@ -1,16 +1,13 @@
-class BankError(Exception):
+class AccountNotFound(Exception):
     pass
 
-class AccountNotFound(BankError):
+class DuplicateAccount(Exception):
     pass
 
-class DuplicateAccount(BankError):
+class InsufficientFunds(Exception):
     pass
 
-class InsufficientFunds(BankError):
-    pass
-
-class ClientNotFound(BankError):
+class ClientNotFound(Exception):
     pass
 
 CURRENCY_RATES = {"BYN": 1.0, "USD": 3.0, "EUR": 3.98}
@@ -235,9 +232,7 @@ def main():
             else:
                 print("Неверный выбор. Попробуйте снова.")
 
-        except BankError as e:
-            print("Ошибка: ", e)
-        except ValueError as e:
+        except Exception as e:
             print("Ошибка: ", e)
 
 if __name__ == "__main__":
