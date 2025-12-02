@@ -90,20 +90,44 @@ plt.title("Общий товарооборот во времени")
 plt.tight_layout()
 plt.show()
 
-# ---  Прогноз продаж по каждому виду товара ---
-plt.figure()
+# --- Прогноз продаж по каждому виду товара ---
+plt.figure(figsize = (14, 8))
+
 for product, group in df.groupby("товар"):
     monthly_sales = group.groupby("Период")["Продажи"].sum().reset_index()
-    x = np.arange(len(monthly_sales))
-    y = monthly_sales["Продажи"].values
-    if len(y) > 1:
+
+    if len(monthly_sales) > 1:
+        x = np.arange(len(monthly_sales))
+        y = monthly_sales["Продажи"].values
+
+        # Линейный тренд
         coeffs = np.polyfit(x, y, 1)
         trend = np.poly1d(coeffs)
-        plt.plot(monthly_sales["Период"], y, label=f"{product} (факт)")
-        plt.plot(monthly_sales["Период"], trend(x), "--", label=f"{product} (тренд)")
 
-plt.xticks(rotation=45)
-plt.title("Прогноз продаж по видам товара (линейный тренд)")
-plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-plt.tight_layout()
+        # Прогноз на 3 месяца вперед
+        last_date = monthly_sales["Период"].max()
+        future_dates = pd.date_range(
+            start = last_date + pd.DateOffset(months = 1),
+            periods = 3,
+            freq = 'MS'
+        )
+
+        # Значения прогноза
+        forecast_x = np.arange(len(monthly_sales), len(monthly_sales) + 3)
+        forecast_y = trend(forecast_x)
+
+        # Рисуем линии
+        plt.plot(monthly_sales["Период"], y, 'o-', label = f"{product} (факт)", markersize = 4)
+        plt.plot(monthly_sales["Период"], trend(x), '--', alpha = 0.5, label = f"{product} (тренд)")
+        plt.plot(future_dates, forecast_y, 's:', label = f"{product} (прогноз)", markersize = 6)
+
+plt.xticks(rotation = 45)
+plt.title("Прогноз продаж по видам товара на 3 месяца", fontsize = 14)
+plt.xlabel("Период")
+plt.ylabel("Продажи, руб.")
+plt.grid(True, alpha = 0.3)
+
+# Уменьшаем легенду и выносим справа
+plt.legend(loc = 'center left', bbox_to_anchor = (1, 0.5), fontsize = 9)
+plt.subplots_adjust(right = 0.75)  # Место для легенды
 plt.show()
