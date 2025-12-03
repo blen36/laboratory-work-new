@@ -2,10 +2,11 @@ import numpy as np
 from scipy import integrate
 
 def integrand1(x):
-    return np.sin(x) / (np.cos(x)**2 + 1)
+    return 1 / (1+np.sin(x)**2)
 
-a = np.pi / 2
-b = np.pi
+
+a = input('Введите верхний предел: ')
+b = input('Введите нижний предел: ')
 
 result1, error1 = integrate.quad(integrand1, a, b)
 
