@@ -5,8 +5,8 @@ months = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май'
 expenses_list = np.random.randint(20, 56, size = 12)
 expenses_per_month = np.array(expenses_list)
 
-winter_indexes = [0,1,11]
-summer_indexes = [5,6,7]
+winter_indexes = [0,1,2,9,10,11]
+summer_indexes = [3,4,5,6,7,8]
 
 winter_pare = np.sum(expenses_per_month[winter_indexes])
 summer_pare = np.sum(expenses_per_month[summer_indexes])
