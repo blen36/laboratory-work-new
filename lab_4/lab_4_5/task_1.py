@@ -7,10 +7,6 @@ sns.set(style="whitegrid")
 plt.rcParams['figure.figsize'] = (12, 8)
 plt.rcParams['font.size'] = 11
 
-
-# ------------------------------------------
-# Функция для подписей столбцов
-# ------------------------------------------
 def add_bar_labels_ax(ax):
     for p in ax.patches:
         value = p.get_height()
@@ -23,15 +19,7 @@ def add_bar_labels_ax(ax):
                     ha='center', va='bottom', fontsize=9,
                     xytext=(0, 6), textcoords='offset points')
 
-
-# ------------------------------------------
-# Утилита: красивый barplot через matplotlib + seaborn palette
-# ------------------------------------------
 def nice_bar_plot(x, y, title, rotation=45, cmap_name="viridis"):
-    """
-    x : list-like (labels)
-    y : list-like (values)
-    """
     labels = list(x)
     values = list(y)
     n = len(values)
@@ -39,7 +27,6 @@ def nice_bar_plot(x, y, title, rotation=45, cmap_name="viridis"):
         print("Нет данных для графика:", title)
         return
 
-    # получить палитру
     palette = sns.color_palette(cmap_name, n_colors=n)
     indices = np.arange(n)
 
@@ -51,7 +38,6 @@ def nice_bar_plot(x, y, title, rotation=45, cmap_name="viridis"):
     ax.set_title(title)
     ax.set_ylabel("Сумма, руб.")
 
-    # подписи значений
     for rect, val in zip(bars, values):
         height = rect.get_height()
         ax.annotate(f"{height:,.0f}",
@@ -63,10 +49,6 @@ def nice_bar_plot(x, y, title, rotation=45, cmap_name="viridis"):
     plt.tight_layout()
     plt.show()
 
-
-# ------------------------------------------
-# Загрузка данных
-# ------------------------------------------
 df = pd.read_excel("lab_4_part_5.xlsx", skiprows=1, usecols="B:J")
 
 print("Размер данных:", df.shape)
@@ -82,9 +64,8 @@ print(f"Общая себестоимость: {total_cost:,.0f} руб.")
 print(f"Общая прибыль: {total_profit:,.0f} руб.")
 print(f"Средняя цена: {avg_price:,.2f} руб.\n")
 
-
 # ------------------------------------------
-# Подготовка дат (исправлено: .str.zfill)
+# Подготовка дат
 # ------------------------------------------
 df["Год-мес"] = df["Год-мес"].astype(str)
 df["Год"] = df["Год-мес"].str[:4].astype(int)
@@ -92,7 +73,6 @@ df["Месяц"] = df["Год-мес"].str[-2:].astype(int)
 df = df[df["Месяц"] <= 12]
 
 df["Период"] = pd.to_datetime(df["Год"].astype(str) + "-" + df["Месяц"].astype(str).str.zfill(2))
-
 
 # ------------------------------------------
 # Динамика продаж по месяцам
@@ -133,7 +113,6 @@ sales_by_store = (
 
 nice_bar_plot(sales_by_store["точка"], sales_by_store["Продажи"], title="Продажи по точкам реализации", cmap_name="magma")
 
-
 # ------------------------------------------
 # Средняя цена по товарам (без предупреждений)
 # ------------------------------------------
@@ -141,7 +120,6 @@ df["Средняя_цена"] = df["Продажи"] / df["Количество"
 avg_price_by_product = df.groupby("товар")["Средняя_цена"].mean().reset_index().sort_values("Средняя_цена", ascending=False)
 
 nice_bar_plot(avg_price_by_product["товар"], avg_price_by_product["Средняя_цена"], title="Средняя цена по видам товара", cmap_name="coolwarm")
-
 
 # ------------------------------------------
 # Динамика общего товарооборота
@@ -154,7 +132,6 @@ sns.lineplot(data=turnover_by_date, x="Дата", y="Продажи", linewidth=
 plt.title("Общий товарооборот во времени")
 plt.tight_layout()
 plt.show()
-
 
 # ------------------------------------------
 # Прогноз продаж по видам товара (3 месяца)
