@@ -4,8 +4,6 @@ from bs4 import BeautifulSoup
 import time
 import os
 import re
-import sys
-
 
 def load_page(country_name, cache_dir = "cache"):
     filename = os.path.join(cache_dir, country_name + ".html")
@@ -41,8 +39,8 @@ def parse_page(html):
     area = None
     population = None
 
-    for row in info_table.find_all("tr"):
-        header = row.find("th")
+    for row in info_table.find_all("tr"): #строки
+        header = row.find("th")  #заголовок
         if not header:
             continue
 
