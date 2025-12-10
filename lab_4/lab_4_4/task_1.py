@@ -29,11 +29,15 @@ print("\n=== ОБРАБОТКА ДАННЫХ ===")
 df['ISSUE_DATE'] = pd.to_datetime(df['ISSUE_DATE'], errors='coerce')
 df['FLIGHT_DATE_LOC'] = pd.to_datetime(df['FLIGHT_DATE_LOC'], errors='coerce')
 df['FFP_FLAG'] = df['FFP_FLAG'].fillna('NO_FFP')
-
-df['ISSUE_MONTH'] = df['ISSUE_DATE'].dt.month
+ORIG_CITY_CODE_mode = df['ORIG_CITY_CODE'].mode()
+df['ORIG_CITY_CODE'].fillna(ORIG_CITY_CODE_mode, inplace=True)
+#df['ISSUE_MONTH'] = df['ISSUE_DATE'].dt.month
 df['ISSUE_YEAR'] = df['ISSUE_DATE'].dt.year
 df['FLIGHT_MONTH'] = df['FLIGHT_DATE_LOC'].dt.month
 df['FLIGHT_YEAR'] = df['FLIGHT_DATE_LOC'].dt.year
+
+print('------------------После------------------')
+print(df.isnull().sum())
 
 print("\n=== ОПИСАТЕЛЬНЫЕ СТАТИСТИКИ ===")
 print(df['REVENUE_AMOUNT'].describe())
@@ -117,6 +121,13 @@ print(f"\nМаксимальная выручка по аэропорту отп
 print(f"Максимальная выручка по аэропорту назначения: {revenue_by_dest.idxmax()} = {revenue_by_dest.max():.0f}")
 
 # ---------------------- АНАЛИЗ СЕЗОННОСТИ ----------------------
+print("\n=== АНАЛИЗ СЕЗОННОСТИ ===")
+
+df['ISSUE_MONTH'] = df['ISSUE_DATE'].dt.month
+df['ISSUE_YEAR'] = df['ISSUE_DATE'].dt.year
+df['FLIGHT_MONTH'] = df['FLIGHT_DATE_LOC'].dt.month
+df['FLIGHT_YEAR'] = df['FLIGHT_DATE_LOC'].dt.year
+
 monthly_sales = df.groupby('ISSUE_MONTH')['REVENUE_AMOUNT'].sum()
 monthly_flights = df.groupby('FLIGHT_MONTH')['REVENUE_AMOUNT'].count()
 
@@ -135,32 +146,6 @@ plt.show()
 
 print("\nМаксимальная выручка по месяцам:", monthly_sales.idxmax(), "=", monthly_sales.max())
 print("Максимальное число перелётов по месяцам:", monthly_flights.idxmax(), "=", monthly_flights.max())
-
-# ---------------------- АНАЛИЗ ПАССАЖИРОВ ----------------------
-print("\n=== АНАЛИЗ ПАССАЖИРОВ ===")
-revenue_by_pax = df.groupby('PAX_TYPE')['REVENUE_AMOUNT'].agg(['mean', 'count', 'sum'])
-revenue_by_ffp = df.groupby('FFP_FLAG')['REVENUE_AMOUNT'].agg(['mean', 'count', 'sum'])
-
-print("Типы пассажиров:\n", revenue_by_pax)
-print(f"\nТип пассажира с максимальной выручкой: {revenue_by_pax['sum'].idxmax()} = {revenue_by_pax['sum'].max():.0f}")
-
-print("\nПрограмма лояльности:\n", revenue_by_ffp)
-print(f"\nFFP-группа с максимальной выручкой: {revenue_by_ffp['sum'].idxmax()} = {revenue_by_ffp['sum'].max():.0f}")
-
-plt.figure(figsize=(15, 5))
-
-plt.subplot(1, 2, 1)
-ax = revenue_by_pax['mean'].plot(kind='bar')
-plt.title('Средняя выручка по типам пассажиров')
-add_bar_labels(ax)
-
-plt.subplot(1, 2, 2)
-ax = revenue_by_ffp['mean'].plot(kind='bar')
-plt.title('Средняя выручка: программа лояльности')
-add_bar_labels(ax)
-
-plt.tight_layout()
-plt.show()
 
 # ---------------------- МЕТОДЫ ОПЛАТЫ ----------------------
 print("\n=== АНАЛИЗ СПОСОБОВ ОПЛАТЫ ===")
