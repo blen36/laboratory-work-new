@@ -7,7 +7,6 @@ from sklearn.linear_model import LinearRegression
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
-
 plt.style.use('seaborn-v0_8')
 sns.set_palette("husl")
 
