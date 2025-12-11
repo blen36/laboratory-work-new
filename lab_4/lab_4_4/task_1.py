@@ -2,6 +2,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.linear_model import LinearRegression
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+from pmdarima import auto_arima
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
+
 
 plt.style.use('seaborn-v0_8')
 sns.set_palette("husl")
@@ -180,81 +184,61 @@ plt.title('Методы оплаты по типам пассажиров (%)')
 plt.tight_layout()
 plt.show()
 
-# ---------------------- ПРОГНОЗ ПРОДАЖ И ПЕРЕЛЁТОВ ----------------------
+# ---------------------- ПРОГНОЗ НА 6 МЕСЯЦЕВ ВПЕРЁД (SARIMAX без сезонности) ----------------------
+print("\n=== ПРОГНОЗ SARIMAX (6 МЕСЯЦЕВ) ===")
 
-print("\n=== ПРОГНОЗ ПРОДАЖ И ПЕРЕЛЁТОВ ===")
+df['YM'] = df['ISSUE_DATE'].dt.to_period('M')
 
-# ===== 1. Агрегация по месяцам =====
-monthly = df.groupby(pd.Grouper(key='ISSUE_DATE', freq='M')).agg({
-    'REVENUE_AMOUNT': 'sum',
-    'FLIGHT_DATE_LOC': 'count'
-}).rename(columns={'FLIGHT_DATE_LOC': 'FLIGHTS'}).reset_index()
+monthly_rev = df.groupby('YM')['REVENUE_AMOUNT'].sum()
+monthly_pax = df.groupby('YM')['REVENUE_AMOUNT'].count()
 
-# Нормальная нумерация месяцев для регрессии
-monthly['MONTH_NUM'] = range(len(monthly))
+monthly_rev.index = monthly_rev.index.to_timestamp()
+monthly_pax.index = monthly_pax.index.to_timestamp()
 
-# ===== 2. Модели =====
-X = monthly[['MONTH_NUM']]
-y_sales = monthly['REVENUE_AMOUNT']
-y_flights = monthly['FLIGHTS']
+steps = 6
+future_dates = pd.date_range(monthly_rev.index[-1] + pd.offsets.MonthBegin(1),
+                             periods=steps, freq="MS")
 
-model_sales = LinearRegression().fit(X, y_sales)
-model_flights = LinearRegression().fit(X, y_flights)
+# ----- МОДЕЛЬ ДЛЯ ВЫРУЧКИ (без сезонности)
+model_rev = SARIMAX(monthly_rev,
+                    order=(1,1,1),
+                    seasonal_order=(0,0,0,0),
+                    enforce_stationarity=False,
+                    enforce_invertibility=False)
 
-# ===== 3. Прогноз на 3 будущих месяца =====
-future_periods = 3
-last_month_num = monthly['MONTH_NUM'].iloc[-1]
+res_rev = model_rev.fit(disp=False)
+rev_mean = res_rev.get_forecast(steps=steps).predicted_mean
 
-future_nums = list(range(last_month_num + 1, last_month_num + 1 + future_periods))
+# ----- МОДЕЛЬ ДЛЯ ПЕРЕЛЁТОВ (без сезонности)
+model_pax = SARIMAX(monthly_pax,
+                    order=(1,1,1),
+                    seasonal_order=(0,0,0,0),
+                    enforce_stationarity=False,
+                    enforce_invertibility=False)
 
-future_dates = pd.date_range(
-    start=monthly['ISSUE_DATE'].iloc[-1] + pd.DateOffset(months=1),
-    periods=future_periods,
-    freq='M'
-)
+res_pax = model_pax.fit(disp=False)
+pax_mean = res_pax.get_forecast(steps=steps).predicted_mean
 
-future_df = pd.DataFrame({
-    'ISSUE_DATE': future_dates,
-    'MONTH_NUM': future_nums
-})
+# ----- ГРАФИКИ БЕЗ РОЗОВОГО ФОНА
+plt.figure(figsize=(16, 6))
 
-# Прогнозы
-future_df['PRED_SALES'] = model_sales.predict(future_df[['MONTH_NUM']])
-future_df['PRED_FLIGHTS'] = model_flights.predict(future_df[['MONTH_NUM']])
-
-# ===== 4. Вывод прогноза в консоль =====
-print("\nПрогноз на следующие 3 месяца:")
-print(future_df[['ISSUE_DATE', 'PRED_SALES', 'PRED_FLIGHTS']])
-
-# ===== 5. Объединяем факт + прогноз для графика =====
-plot_df = pd.concat([
-    monthly[['ISSUE_DATE', 'REVENUE_AMOUNT', 'FLIGHTS']],
-    future_df.rename(columns={
-        'PRED_SALES': 'REVENUE_AMOUNT',
-        'PRED_FLIGHTS': 'FLIGHTS'
-    })[['ISSUE_DATE', 'REVENUE_AMOUNT', 'FLIGHTS']]
-], ignore_index=True)
-
-# Отметим где прогноз
-is_future = [False] * len(monthly) + [True] * len(future_df)
-
-# ===== 6. График прогноза =====
-plt.figure(figsize=(14, 6))
-
-# ---- выручка ----
-plt.subplot(1, 2, 1)
-plt.plot(monthly['ISSUE_DATE'], monthly['REVENUE_AMOUNT'], label='Факт', color='blue')
-plt.plot(future_df['ISSUE_DATE'], future_df['PRED_SALES'], 'o--', label='Прогноз', color='gold')
-plt.title('Прогноз выручки на 3 месяца')
+plt.subplot(1,2,1)
+plt.plot(monthly_rev.index, monthly_rev.values, "o-", label="Фактическая выручка")
+plt.plot(future_dates, rev_mean, "--", label="Прогноз")
+plt.title("SARIMAX прогноз выручки на 6 месяцев")
+plt.xlabel("Дата"); plt.ylabel("Выручка")
 plt.legend()
 
-# ---- перелёты ----
-plt.subplot(1, 2, 2)
-plt.plot(monthly['ISSUE_DATE'], monthly['FLIGHTS'], label='Факт', color='green')
-plt.plot(future_df['ISSUE_DATE'], future_df['PRED_FLIGHTS'], 'o--', label='Прогноз', color='orange')
-plt.title('Прогноз количества перелётов на 3 месяца')
+plt.subplot(1,2,2)
+plt.plot(monthly_pax.index, monthly_pax.values, "o-", label="Фактическое число перелётов")
+plt.plot(future_dates, pax_mean, "--", label="Прогноз")
+plt.title("SARIMAX прогноз числа перелётов на 6 месяцев")
+plt.xlabel("Дата"); plt.ylabel("Количество перелётов")
 plt.legend()
 
 plt.tight_layout()
 plt.show()
+
+
+
 
