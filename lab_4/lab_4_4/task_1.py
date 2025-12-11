@@ -1,9 +1,10 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
+from statsmodels.tsa.seasonal import seasonal_decompose
 from sklearn.linear_model import LinearRegression
 from statsmodels.tsa.statespace.sarimax import SARIMAX
-from pmdarima import auto_arima
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 
@@ -184,61 +185,229 @@ plt.title('Методы оплаты по типам пассажиров (%)')
 plt.tight_layout()
 plt.show()
 
-# ---------------------- ПРОГНОЗ НА 6 МЕСЯЦЕВ ВПЕРЁД (SARIMAX без сезонности) ----------------------
-print("\n=== ПРОГНОЗ SARIMAX (6 МЕСЯЦЕВ) ===")
 
-df['YM'] = df['ISSUE_DATE'].dt.to_period('M')
+# ---------------------- ПРОГНОЗИРОВАНИЕ НА 6 МЕСЯЦЕВ ----------------------
 
-monthly_rev = df.groupby('YM')['REVENUE_AMOUNT'].sum()
-monthly_pax = df.groupby('YM')['REVENUE_AMOUNT'].count()
+print("\n=== ПРОГНОЗИРОВАНИЕ НА 6 МЕСЯЦЕВ ===")
 
-monthly_rev.index = monthly_rev.index.to_timestamp()
-monthly_pax.index = monthly_pax.index.to_timestamp()
+# Подготовка данных для прогноза
+df_issue_date = df.copy()
+df_issue_date['ISSUE_DATE'] = pd.to_datetime(df_issue_date['ISSUE_DATE'])
 
-steps = 6
-future_dates = pd.date_range(monthly_rev.index[-1] + pd.offsets.MonthBegin(1),
-                             periods=steps, freq="MS")
+# Группировка по дате продажи (ISSUE_DATE)
+# Сначала проверяем, есть ли колонка TICKET_NUMBER
+if 'TICKET_NUMBER' in df_issue_date.columns:
+    daily_sales = df_issue_date.groupby('ISSUE_DATE').agg({
+        'REVENUE_AMOUNT': 'sum',
+        'TICKET_NUMBER': 'count'
+    }).rename(columns = {'TICKET_NUMBER': 'TICKET_COUNT'})
+else:
+    # Если нет колонки TICKET_NUMBER, просто считаем строки
+    daily_sales = df_issue_date.groupby('ISSUE_DATE').agg({
+        'REVENUE_AMOUNT': 'sum'
+    })
+    daily_sales['TICKET_COUNT'] = df_issue_date.groupby('ISSUE_DATE').size()
 
-# ----- МОДЕЛЬ ДЛЯ ВЫРУЧКИ (без сезонности)
-model_rev = SARIMAX(monthly_rev,
-                    order=(1,1,1),
-                    seasonal_order=(0,0,0,0),
-                    enforce_stationarity=False,
-                    enforce_invertibility=False)
+daily_sales = daily_sales.asfreq('D')
+daily_sales['REVENUE_AMOUNT'] = daily_sales['REVENUE_AMOUNT'].fillna(0)
+daily_sales['TICKET_COUNT'] = daily_sales['TICKET_COUNT'].fillna(0)
 
-res_rev = model_rev.fit(disp=False)
-rev_mean = res_rev.get_forecast(steps=steps).predicted_mean
+# Агрегация по месяцам для более стабильного прогноза
+monthly_data = daily_sales.resample('M').agg({
+    'REVENUE_AMOUNT': 'sum',
+    'TICKET_COUNT': 'sum'
+})
 
-# ----- МОДЕЛЬ ДЛЯ ПЕРЕЛЁТОВ (без сезонности)
-model_pax = SARIMAX(monthly_pax,
-                    order=(1,1,1),
-                    seasonal_order=(0,0,0,0),
-                    enforce_stationarity=False,
-                    enforce_invertibility=False)
+print(f"Доступные данные за период: {monthly_data.index.min()} - {monthly_data.index.max()}")
+print(f"Количество месяцев в данных: {len(monthly_data)}")
 
-res_pax = model_pax.fit(disp=False)
-pax_mean = res_pax.get_forecast(steps=steps).predicted_mean
+# Проверка на наличие достаточных данных для прогноза
+if len(monthly_data) < 12:
+    print("ВНИМАНИЕ: Недостаточно данных для сезонного прогноза!")
+    # Используем простую линейную регрессию
+    X = np.arange(len(monthly_data)).reshape(-1, 1)
+    y_revenue = monthly_data['REVENUE_AMOUNT'].values
+    y_tickets = monthly_data['TICKET_COUNT'].values
 
-# ----- ГРАФИКИ БЕЗ РОЗОВОГО ФОНА
-plt.figure(figsize=(16, 6))
+    model_revenue = LinearRegression()
+    model_tickets = LinearRegression()
 
-plt.subplot(1,2,1)
-plt.plot(monthly_rev.index, monthly_rev.values, "o-", label="Фактическая выручка")
-plt.plot(future_dates, rev_mean, "--", label="Прогноз")
-plt.title("SARIMAX прогноз выручки на 6 месяцев")
-plt.xlabel("Дата"); plt.ylabel("Выручка")
-plt.legend()
+    model_revenue.fit(X, y_revenue)
+    model_tickets.fit(X, y_tickets)
 
-plt.subplot(1,2,2)
-plt.plot(monthly_pax.index, monthly_pax.values, "o-", label="Фактическое число перелётов")
-plt.plot(future_dates, pax_mean, "--", label="Прогноз")
-plt.title("SARIMAX прогноз числа перелётов на 6 месяцев")
-plt.xlabel("Дата"); plt.ylabel("Количество перелётов")
-plt.legend()
+    # Прогноз на 6 месяцев вперед
+    future_months = np.arange(len(monthly_data), len(monthly_data) + 6).reshape(-1, 1)
+    revenue_forecast = model_revenue.predict(future_months)
+    tickets_forecast = model_tickets.predict(future_months)
+
+    # Создание дат для прогноза
+    last_date = monthly_data.index[-1]
+    forecast_dates = [last_date + pd.DateOffset(months = i + 1) for i in range(6)]
+
+else:
+    # Используем SARIMA для прогнозирования с учетом сезонности
+    print("Используем SARIMA для прогнозирования с учетом сезонности")
+
+    try:
+        # Прогноз выручки
+        model_revenue = SARIMAX(monthly_data['REVENUE_AMOUNT'],
+                                order = (1, 1, 1),
+                                seasonal_order = (1, 1, 1, 12),
+                                enforce_stationarity = False,
+                                enforce_invertibility = False)
+
+        revenue_fit = model_revenue.fit(disp = False)
+        revenue_forecast = revenue_fit.forecast(steps = 6)
+
+        # Прогноз количества билетов
+        model_tickets = SARIMAX(monthly_data['TICKET_COUNT'],
+                                order = (1, 1, 1),
+                                seasonal_order = (1, 1, 1, 12),
+                                enforce_stationarity = False,
+                                enforce_invertibility = False)
+
+        tickets_fit = model_tickets.fit(disp = False)
+        tickets_forecast = tickets_fit.forecast(steps = 6)
+
+        # Создание дат для прогноза
+        last_date = monthly_data.index[-1]
+        forecast_dates = pd.date_range(start = last_date + pd.DateOffset(months = 1),
+                                       periods = 6, freq = 'M')
+
+    except Exception as e:
+        print(f"Ошибка в SARIMA: {e}. Используем Holt-Winters")
+
+        # Используем Holt-Winters как запасной вариант
+        model_revenue = ExponentialSmoothing(monthly_data['REVENUE_AMOUNT'],
+                                             seasonal = 'add',
+                                             seasonal_periods = 12).fit()
+        model_tickets = ExponentialSmoothing(monthly_data['TICKET_COUNT'],
+                                             seasonal = 'add',
+                                             seasonal_periods = 12).fit()
+
+        revenue_forecast = model_revenue.forecast(6)
+        tickets_forecast = model_tickets.forecast(6)
+
+        last_date = monthly_data.index[-1]
+        forecast_dates = pd.date_range(start = last_date + pd.DateOffset(months = 1),
+                                       periods = 6, freq = 'M')
+
+# Создание DataFrame с прогнозом
+forecast_df = pd.DataFrame({
+    'Date': forecast_dates,
+    'REVENUE_AMOUNT': revenue_forecast,
+    'TICKET_COUNT': tickets_forecast
+})
+forecast_df.set_index('Date', inplace = True)
+
+# Объединение фактических данных и прогноза
+full_data_revenue = pd.concat([monthly_data[['REVENUE_AMOUNT']],
+                               forecast_df[['REVENUE_AMOUNT']]], axis = 0)
+full_data_revenue['Type'] = ['Факт'] * len(monthly_data) + ['Прогноз'] * len(forecast_df)
+
+full_data_tickets = pd.concat([monthly_data[['TICKET_COUNT']],
+                               forecast_df[['TICKET_COUNT']]], axis = 0)
+full_data_tickets['Type'] = ['Факт'] * len(monthly_data) + ['Прогноз'] * len(forecast_df)
+
+# Создание графиков прогноза
+fig, axes = plt.subplots(2, 1, figsize = (15, 12))
+
+# График 1: Прогноз выручки
+ax1 = axes[0]
+# Фактические данные
+actual_revenue = full_data_revenue[full_data_revenue['Type'] == 'Факт']
+ax1.plot(actual_revenue.index, actual_revenue['REVENUE_AMOUNT'],
+         'b-', linewidth = 2, marker = 'o', markersize = 5, label = 'Фактические данные')
+
+# Прогноз
+forecast_revenue = full_data_revenue[full_data_revenue['Type'] == 'Прогноз']
+ax1.plot(forecast_revenue.index, forecast_revenue['REVENUE_AMOUNT'],
+         'r--', linewidth = 2, marker = 's', markersize = 5, label = 'Прогноз')
+
+# Вертикальная линия разделения
+split_date = forecast_df.index[0]
+ax1.axvline(x = split_date, color = 'gray', linestyle = '--', alpha = 0.7)
+
+# Заполнение области прогноза
+ax1.fill_between(forecast_revenue.index,
+                 forecast_revenue['REVENUE_AMOUNT'] * 0.8,
+                 forecast_revenue['REVENUE_AMOUNT'] * 1.2,
+                 alpha = 0.2, color = 'red', label = 'Доверительный интервал (±20%)')
+
+ax1.set_title('ПРОГНОЗ ОБЪЕМОВ ПРОДАЖ БИЛЕТОВ НА 6 МЕСЯЦЕВ', fontsize = 14, fontweight = 'bold')
+ax1.set_xlabel('Дата')
+ax1.set_ylabel('Выручка (руб.)')
+ax1.legend()
+ax1.grid(True, alpha = 0.3)
+ax1.tick_params(axis = 'x', rotation = 45)
+
+# Добавление значений на график
+for i, (idx, row) in enumerate(forecast_revenue.iterrows()):
+    ax1.annotate(f'{row["REVENUE_AMOUNT"]:,.0f}'.replace(',', ' '),
+                 (idx, row["REVENUE_AMOUNT"]),
+                 textcoords = "offset points",
+                 xytext = (0, 10),
+                 ha = 'center',
+                 fontsize = 9,
+                 bbox = dict(boxstyle = "round,pad=0.3", facecolor = "yellow", alpha = 0.7))
+
+# График 2: Прогноз количества перелетов
+ax2 = axes[1]
+# Фактические данные
+actual_tickets = full_data_tickets[full_data_tickets['Type'] == 'Факт']
+ax2.plot(actual_tickets.index, actual_tickets['TICKET_COUNT'],
+         'g-', linewidth = 2, marker = 'o', markersize = 5, label = 'Фактические данные')
+
+# Прогноз
+forecast_tickets = full_data_tickets[full_data_tickets['Type'] == 'Прогноз']
+ax2.plot(forecast_tickets.index, forecast_tickets['TICKET_COUNT'],
+         'orange', linestyle = '--', linewidth = 2, marker = 's', markersize = 5, label = 'Прогноз')
+
+# Вертикальная линия разделения
+ax2.axvline(x = split_date, color = 'gray', linestyle = '--', alpha = 0.7)
+
+# Заполнение области прогноза
+ax2.fill_between(forecast_tickets.index,
+                 forecast_tickets['TICKET_COUNT'] * 0.8,
+                 forecast_tickets['TICKET_COUNT'] * 1.2,
+                 alpha = 0.2, color = 'orange', label = 'Доверительный интервал (±20%)')
+
+ax2.set_title('ПРОГНОЗ КОЛИЧЕСТВА ПЕРЕЛЕТОВ НА 6 МЕСЯЦЕВ', fontsize = 14, fontweight = 'bold')
+ax2.set_xlabel('Дата')
+ax2.set_ylabel('Количество билетов')
+ax2.legend()
+ax2.grid(True, alpha = 0.3)
+ax2.tick_params(axis = 'x', rotation = 45)
+
+# Добавление значений на график
+for i, (idx, row) in enumerate(forecast_tickets.iterrows()):
+    ax2.annotate(f'{row["TICKET_COUNT"]:,.0f}'.replace(',', ' '),
+                 (idx, row["TICKET_COUNT"]),
+                 textcoords = "offset points",
+                 xytext = (0, 10),
+                 ha = 'center',
+                 fontsize = 9,
+                 bbox = dict(boxstyle = "round,pad=0.3", facecolor = "lightgreen", alpha = 0.7))
 
 plt.tight_layout()
 plt.show()
 
+# Вывод статистики прогноза
+print("\n=== СТАТИСТИКА ПРОГНОЗА ===")
+print("\nПрогноз выручки на следующие 6 месяцев:")
+for date, value in zip(forecast_df.index, forecast_df['REVENUE_AMOUNT']):
+    print(f"  {date.strftime('%Y-%m')}: {value:,.0f} руб.".replace(',', ' '))
 
+print(f"\nСуммарная прогнозируемая выручка: {forecast_df['REVENUE_AMOUNT'].sum():,.0f} руб.".replace(',', ' '))
+print(f"Среднемесячная прогнозируемая выручка: {forecast_df['REVENUE_AMOUNT'].mean():,.0f} руб.".replace(',', ' '))
 
+print("\nПрогноз количества перелетов на следующие 6 месяцев:")
+for date, value in zip(forecast_df.index, forecast_df['TICKET_COUNT']):
+    print(f"  {date.strftime('%Y-%m')}: {value:,.0f} билетов".replace(',', ' '))
 
+print(f"\nСуммарное прогнозируемое количество перелетов: {forecast_df['TICKET_COUNT'].sum():,.0f} билетов".replace(',',
+                                                                                                                   ' '))
+print(f"Среднемесячное прогнозируемое количество перелетов: {forecast_df['TICKET_COUNT'].mean():,.0f} билетов".replace(
+    ',', ' '))
+
+print("\n=== ПРОГНОЗИРОВАНИЕ ЗАВЕРШЕНО ===")
