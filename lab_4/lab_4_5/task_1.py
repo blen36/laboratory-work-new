@@ -64,9 +64,6 @@ print(f"Общая себестоимость: {total_cost:,.0f} руб.")
 print(f"Общая прибыль: {total_profit:,.0f} руб.")
 print(f"Средняя цена: {avg_price:,.2f} руб.\n")
 
-# ------------------------------------------
-# Подготовка дат
-# ------------------------------------------
 df["Год-мес"] = df["Год-мес"].astype(str)
 df["Год"] = df["Год-мес"].str[:4].astype(int)
 df["Месяц"] = df["Год-мес"].str[-2:].astype(int)
@@ -74,9 +71,6 @@ df = df[df["Месяц"] <= 12]
 
 df["Период"] = pd.to_datetime(df["Год"].astype(str) + "-" + df["Месяц"].astype(str).str.zfill(2))
 
-# ------------------------------------------
-# Динамика продаж по месяцам
-# ------------------------------------------
 sales_by_month = df.groupby("Период")[["Продажи", "Себестоимость"]].sum().reset_index()
 
 plt.figure()
@@ -89,10 +83,6 @@ plt.xticks(rotation=45)
 plt.tight_layout()
 plt.show()
 
-
-# ------------------------------------------
-# Продажи по видам товара (без предупреждений)
-# ------------------------------------------
 sales_by_product = (
     df.groupby("товар")[["Количество", "Продажи", "Себестоимость"]]
     .sum()
@@ -101,10 +91,6 @@ sales_by_product = (
 
 nice_bar_plot(sales_by_product["товар"], sales_by_product["Продажи"], title="Продажи по видам товара", cmap_name="viridis")
 
-
-# ------------------------------------------
-# Продажи по точкам реализации (без предупреждений)
-# ------------------------------------------
 sales_by_store = (
     df.groupby("точка")[["Продажи", "Количество"]]
     .sum()
@@ -113,17 +99,11 @@ sales_by_store = (
 
 nice_bar_plot(sales_by_store["точка"], sales_by_store["Продажи"], title="Продажи по точкам реализации", cmap_name="magma")
 
-# ------------------------------------------
-# Средняя цена по товарам (без предупреждений)
-# ------------------------------------------
 df["Средняя_цена"] = df["Продажи"] / df["Количество"]
 avg_price_by_product = df.groupby("товар")["Средняя_цена"].mean().reset_index().sort_values("Средняя_цена", ascending=False)
 
 nice_bar_plot(avg_price_by_product["товар"], avg_price_by_product["Средняя_цена"], title="Средняя цена по видам товара", cmap_name="coolwarm")
 
-# ------------------------------------------
-# Динамика общего товарооборота
-# ------------------------------------------
 df["Дата"] = pd.to_datetime(df["Дата"])
 turnover_by_date = df.groupby("Дата")["Продажи"].sum().reset_index()
 
@@ -133,12 +113,8 @@ plt.title("Общий товарооборот во времени")
 plt.tight_layout()
 plt.show()
 
-# ------------------------------------------
-# Прогноз продаж по видам товара (3 месяца) - ИСПРАВЛЕННАЯ ВЕРСИЯ
-# ------------------------------------------
 plt.figure(figsize = (14, 8))
 
-# Создаем цветовую палитру для товаров
 products = df["товар"].unique()
 colors = plt.cm.tab20(np.linspace(0, 1, len(products)))
 
@@ -146,21 +122,17 @@ for idx, product in enumerate(products):
     group = df[df["товар"] == product]
     monthly_sales = group.groupby("Период")["Продажи"].sum().reset_index().sort_values("Период")
 
-    if len(monthly_sales) > 2:  # Нужно хотя бы 3 точки для прогноза
+    if len(monthly_sales) > 2:
         x = np.arange(len(monthly_sales))
         y = monthly_sales["Продажи"].values
 
-        # Улучшенный прогноз: учитываем последние значения и сезонность
-        # Используем взвешенную линейную регрессию (больший вес у последних данных)
-        weights = np.exp(np.linspace(0, 1, len(x)))  # Экспоненциальные веса
+        weights = np.exp(np.linspace(0, 1, len(x)))
         coeffs = np.polyfit(x, y, 1, w = weights)
         trend = np.poly1d(coeffs)
 
-        # Рассчитываем стандартное отклонение для оценки "разброса"
         residuals = y - trend(x)
         std_residual = np.std(residuals)
 
-        # Прогноз на 3 месяца вперед
         last_date = monthly_sales["Период"].max()
         future_dates = pd.date_range(
             start = last_date + pd.DateOffset(months = 1),
@@ -171,32 +143,23 @@ for idx, product in enumerate(products):
         forecast_x = np.arange(len(monthly_sales), len(monthly_sales) + 3)
         forecast_y = trend(forecast_x)
 
-        # Добавляем случайную компоненту на основе исторической волатильности
-        # но ограничиваем, чтобы значения не уходили в минус
-        noise = np.random.normal(0, std_residual * 0.7, 3)  # 70% от std для сглаживания
-        forecast_y = np.maximum(forecast_y + noise, 0)  # Не допускаем отрицательных значений
+        noise = np.random.normal(0, std_residual * 0.7, 3)
+        forecast_y = np.maximum(forecast_y + noise, 0)
 
-        # Добавляем небольшую коррекцию на основе последнего известного значения
         last_value = y[-1]
-        forecast_y = (forecast_y * 0.7) + (last_value * 0.3)  # Смешиваем с последним значением
+        forecast_y = (forecast_y * 0.7) + (last_value * 0.3)
 
-        # Построение графика
         color = colors[idx]
-
-        # Исторические данные (сплошная линия)
         plt.plot(monthly_sales["Период"], y, 'o-',
                  label = f"{product} (факт)",
                  markersize = 5,
                  linewidth = 2,
                  color = color)
 
-        # Прогноз (штриховая с маркерами)
-        # Соединяем последнюю точку с первой прогнозной
         plt.plot([last_date, future_dates[0]],
                  [last_value, forecast_y[0]],
                  '--', alpha = 0.7, color = color)
 
-        # Прогнозные точки
         plt.plot(future_dates, forecast_y, 's--',
                  label = f"{product} (прогноз)",
                  markersize = 7,
@@ -211,7 +174,6 @@ plt.xlabel("Период", fontsize = 12)
 plt.ylabel("Продажи, руб.", fontsize = 12)
 plt.grid(True, alpha = 0.3)
 
-# Вертикальная линия разделения факта и прогноза
 last_overall_date = df["Период"].max()
 plt.axvline(x = last_overall_date, color = 'gray', linestyle = '--', alpha = 0.5, linewidth = 1)
 plt.text(last_overall_date, plt.ylim()[1] * 0.95, "Начало прогноза",
@@ -222,36 +184,27 @@ plt.subplots_adjust(right = 0.75)
 plt.tight_layout()
 plt.show()
 
-# ------------------------------------------
-# Прогноз продаж для 4 ключевых товаров
-# ------------------------------------------
-
-# Выбираем 4 товара с наибольшими продажами за весь период
 top_products = df.groupby("товар")["Продажи"].sum().nlargest(4).index.tolist()
 
 plt.figure(figsize = (14, 8))
 
-# Создаем цветовую палитру для 4 товаров
 colors = plt.cm.Set2(np.linspace(0, 1, len(top_products)))
 
 for idx, product in enumerate(top_products):
     group = df[df["товар"] == product]
     monthly_sales = group.groupby("Период")["Продажи"].sum().reset_index().sort_values("Период")
 
-    if len(monthly_sales) > 2:  # Нужно хотя бы 3 точки для прогноза
+    if len(monthly_sales) > 2:
         x = np.arange(len(monthly_sales))
         y = monthly_sales["Продажи"].values
 
-        # Улучшенный прогноз: учитываем последние значения и сезонность
-        weights = np.exp(np.linspace(0, 1, len(x)))  # Экспоненциальные веса
+        weights = np.exp(np.linspace(0, 1, len(x)))
         coeffs = np.polyfit(x, y, 1, w = weights)
         trend = np.poly1d(coeffs)
 
-        # Рассчитываем стандартное отклонение для оценки "разброса"
         residuals = y - trend(x)
         std_residual = np.std(residuals)
 
-        # Прогноз на 3 месяца вперед
         last_date = monthly_sales["Период"].max()
         future_dates = pd.date_range(
             start = last_date + pd.DateOffset(months = 1),
@@ -262,31 +215,23 @@ for idx, product in enumerate(top_products):
         forecast_x = np.arange(len(monthly_sales), len(monthly_sales) + 3)
         forecast_y = trend(forecast_x)
 
-        # Добавляем случайную компоненту на основе исторической волатильности
         noise = np.random.normal(0, std_residual * 0.7, 3)
         forecast_y = np.maximum(forecast_y + noise, 0)
 
-        # Добавляем небольшую коррекцию на основе последнего известного значения
         last_value = y[-1]
         forecast_y = (forecast_y * 0.7) + (last_value * 0.3)
-
-        # Построение графика
         color = colors[idx]
 
-        # Исторические данные (сплошная линия)
         plt.plot(monthly_sales["Период"], y, 'o-',
                  label = f"{product} (факт)",
                  markersize = 6,
                  linewidth = 2.5,
                  color = color)
 
-        # Прогноз (штриховая с маркерами)
-        # Соединяем последнюю точку с первой прогнозной
         plt.plot([last_date, future_dates[0]],
                  [last_value, forecast_y[0]],
                  '--', alpha = 0.7, color = color, linewidth = 2)
 
-        # Прогнозные точки
         plt.plot(future_dates, forecast_y, 's--',
                  label = f"{product} (прогноз)",
                  markersize = 8,
@@ -295,14 +240,12 @@ for idx, product in enumerate(top_products):
                  alpha = 0.9,
                  markeredgewidth = 1.5)
 
-        # Заполняем область неопределенности прогноза
         plt.fill_between(future_dates,
                          forecast_y - std_residual * 0.5,
                          forecast_y + std_residual * 0.5,
                          alpha = 0.2,
                          color = color)
 
-        # Выводим значения прогноза
         for i, (date, value) in enumerate(zip(future_dates, forecast_y)):
             plt.annotate(f"{value:,.0f}",
                          xy = (date, value),
@@ -325,14 +268,12 @@ plt.xlabel("Период", fontsize = 13)
 plt.ylabel("Продажи, руб.", fontsize = 13)
 plt.grid(True, alpha = 0.3)
 
-# Вертикальная линия разделения факта и прогноза
 last_overall_date = df["Период"].max()
 plt.axvline(x = last_overall_date, color = 'gray', linestyle = '--', alpha = 0.7, linewidth = 2)
 plt.text(last_overall_date, plt.ylim()[1] * 0.95, "Начало прогноза",
          ha = 'right', va = 'top', fontsize = 10, color = 'gray',
          rotation = 90, fontweight = 'bold')
 
-# Добавляем легенду
 plt.legend(loc = 'upper left', fontsize = 11, framealpha = 0.9, shadow = True)
 
 plt.tight_layout()
